@@ -11,6 +11,7 @@ type TaskLog = {
   scheduleDate: string;
   status: boolean;
   title: string;
+  tag: string | null;
 };
 
 type DailyStatus = {
@@ -32,6 +33,21 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string>("其他");
+
+  const SUBJECT_TAGS = [
+    { name: "语文", color: "from-rose-400 to-rose-500", bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-100" },
+    { name: "数学", color: "from-blue-400 to-blue-500", bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-100" },
+    { name: "英语", color: "from-emerald-400 to-emerald-500", bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-100" },
+    { name: "物理", color: "from-violet-400 to-violet-500", bg: "bg-violet-50", text: "text-violet-600", border: "border-violet-100" },
+    { name: "化学", color: "from-amber-400 to-amber-500", bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-100" },
+    { name: "生物", color: "from-teal-400 to-teal-500", bg: "bg-teal-50", text: "text-teal-600", border: "border-teal-100" },
+    { name: "其他", color: "from-slate-400 to-slate-500", bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-100" },
+  ];
+
+  const getTagStyle = (tagName: string | null) => {
+    return SUBJECT_TAGS.find(t => t.name === tagName) || SUBJECT_TAGS[6];
+  };
   
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDayTasks, setSelectedDayTasks] = useState<TaskLog[] | null>(null);
@@ -112,11 +128,13 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           title: newTaskTitle,
+          tag: selectedTag,
           localDate: format(todayDate, "yyyy-MM-dd") 
         }),
       });
       if (res.ok) {
         setNewTaskTitle("");
+        setSelectedTag("其他");
         setIsModalOpen(false);
         fetchTasks();
         fetchMonthStatus();
@@ -198,6 +216,13 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
                   <Circle className="w-6 h-6 text-slate-300 group-hover:text-slate-500" />
                 )}
               </button>
+              
+              {task.tag && (
+                <div className={`px-2.5 py-1 rounded-lg text-xs font-bold mr-3 border ${getTagStyle(task.tag).bg} ${getTagStyle(task.tag).text} ${getTagStyle(task.tag).border} shadow-sm flex-shrink-0`}>
+                  {task.tag}
+                </div>
+              )}
+
               <span className={`text-lg font-medium transition-all ${
                 task.status ? 'text-slate-400 line-through' : 'text-slate-700'
               }`}>
@@ -415,6 +440,26 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
                   placeholder="任务名称（例如：英语第一单元生词）"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 transition-all font-medium"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-600 mb-3">选择学科标签</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {SUBJECT_TAGS.map((tag) => (
+                    <button
+                      key={tag.name}
+                      type="button"
+                      onClick={() => setSelectedTag(tag.name)}
+                      className={`py-2 px-1 rounded-xl text-xs font-bold transition-all border-2 ${
+                        selectedTag === tag.name
+                          ? `${tag.bg} ${tag.text} ${tag.border.replace('border-', 'border-')} ring-2 ring-offset-1 ring-slate-200`
+                          : "bg-white text-slate-400 border-slate-100 hover:border-slate-200"
+                      }`}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex gap-3 justify-end">
                 <button

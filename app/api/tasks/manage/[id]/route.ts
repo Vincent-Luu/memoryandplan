@@ -28,15 +28,15 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { title } = await request.json();
+    const { title, tag } = await request.json();
     const taskId = parseInt(id, 10);
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
     
-    // Update the task title
-    const updatedTask = await db.update(tasks).set({ title }).where(eq(tasks.id, taskId)).returning();
+    // Update the task title and tag
+    const updatedTask = await db.update(tasks).set({ title, tag }).where(eq(tasks.id, taskId)).returning();
 
     if (updatedTask.length === 0) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });

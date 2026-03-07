@@ -5,11 +5,11 @@ import { eq } from 'drizzle-orm';
 
 export async function POST(request: Request) {
   try {
-    const { title, localDate } = await request.json();
+    const { title, tag, localDate } = await request.json();
     if (!title) return NextResponse.json({ error: 'Title is required' }, { status: 400 });
 
     // Insert new task
-    const newTask = await db.insert(tasks).values({ title }).returning({ id: tasks.id });
+    const newTask = await db.insert(tasks).values({ title, tag }).returning({ id: tasks.id });
     const taskId = newTask[0].id;
 
     // Use provided localDate (YYYY-MM-DD) or fallback to server date
@@ -59,6 +59,7 @@ export async function GET(request: Request) {
       scheduleDate: taskLogs.scheduleDate,
       status: taskLogs.status,
       title: tasks.title,
+      tag: tasks.tag,
     })
     .from(taskLogs)
     .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))

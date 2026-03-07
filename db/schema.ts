@@ -3,6 +3,7 @@ import { pgTable, serial, text, timestamp, date, boolean, integer } from "drizzl
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
+  tag: text("tag"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

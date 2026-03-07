@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../../db';
 import { tasks, taskLogs } from '../../../../db/schema';
-import { eq } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    const allTasks = await db.select().from(tasks).orderBy(tasks.createdAt);
+    const allTasks = await db.select({
+      id: tasks.id,
+      title: tasks.title,
+      tag: tasks.tag,
+      createdAt: tasks.createdAt,
+      totalLogs: sql<number>`count(${taskLogs.id})`.mapWith(Number),
+      completedLogs: sql<number>`count(CASE WHEN ${taskLogs.status} = true THEN 1 END)`.mapWith(Number),
+    })
+    .from(tasks)
+    .leftJoin(taskLogs, eq(tasks.id, taskLogs.taskId))
+    .groupBy(tasks.id)
+    .orderBy(tasks.createdAt);
+    
     return NextResponse.json(allTasks);
   } catch (error) {
     console.error('Error fetching tasks:', error);

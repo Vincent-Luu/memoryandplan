@@ -27,6 +27,7 @@ export default async function Page() {
       scheduleDate: taskLogs.scheduleDate,
       status: taskLogs.status,
       title: tasks.title,
+      tag: tasks.tag,
     })
     .from(taskLogs)
     .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))
@@ -38,6 +39,7 @@ export default async function Page() {
       scheduleDate: taskLogs.scheduleDate,
       status: taskLogs.status,
       title: tasks.title,
+      tag: tasks.tag,
     })
     .from(taskLogs)
     .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))
@@ -49,6 +51,7 @@ export default async function Page() {
       scheduleDate: taskLogs.scheduleDate,
       status: taskLogs.status,
       title: tasks.title,
+      tag: tasks.tag,
     })
     .from(taskLogs)
     .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))
