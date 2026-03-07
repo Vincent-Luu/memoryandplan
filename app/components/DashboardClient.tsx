@@ -384,7 +384,7 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
                 daySection="preview"
               />
             </div>
-            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
+            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-start items-center">
               <button 
                 onClick={() => {
                     setIsPreviewModalOpen(false);
@@ -393,12 +393,6 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
                 className="text-slate-500 font-bold hover:text-slate-800 transition-colors"
               >
                 ← 返回日历
-              </button>
-              <button 
-                onClick={() => setIsPreviewModalOpen(false)}
-                className="px-8 py-3 bg-slate-800 text-white rounded-2xl font-bold hover:bg-slate-700 transition-colors shadow-lg shadow-slate-200"
-              >
-                关闭
               </button>
             </div>
           </div>
