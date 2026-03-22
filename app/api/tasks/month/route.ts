@@ -1,16 +1,30 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../../db';
-import { taskLogs } from '../../../../db/schema';
-import { gte, lte, and } from 'drizzle-orm';
+import { taskLogs, tasks } from '../../../../db/schema';
+import { gte, lte, and, isNull, eq } from 'drizzle-orm';
+import { getCurrentUser } from '../../../../lib/auth';
 
 export async function GET(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const start = searchParams.get('start');
     const end = searchParams.get('end');
+    const targetUserIdStr = searchParams.get('userId');
 
     if (!start || !end) {
       return NextResponse.json({ error: 'Start and end dates are required' }, { status: 400 });
+    }
+
+    let userCondition;
+    if (user.admin && targetUserIdStr) {
+      userCondition = eq(tasks.userId, parseInt(targetUserIdStr, 10));
+    } else if (user.admin && user.id === null) {
+      userCondition = isNull(tasks.userId);
+    } else {
+      userCondition = eq(tasks.userId, user.id as number);
     }
 
     // Fetch the task logs for the specified date range
@@ -20,7 +34,8 @@ export async function GET(request: Request) {
       status: taskLogs.status,
     })
     .from(taskLogs)
-    .where(and(gte(taskLogs.scheduleDate, start), lte(taskLogs.scheduleDate, end)));
+    .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))
+    .where(and(gte(taskLogs.scheduleDate, start), lte(taskLogs.scheduleDate, end), userCondition));
 
     // Group logs by date to compute daily completion status
     const dailyStatus: Record<string, { completed: number; total: number }> = {};
@@ -42,3 +57,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+

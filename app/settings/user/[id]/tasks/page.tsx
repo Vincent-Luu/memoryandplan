@@ -1,17 +1,28 @@
 import { format, addDays, subDays, startOfMonth, endOfMonth } from "date-fns";
-import { db } from "../db";
-import { tasks, taskLogs } from "../db/schema";
-import { eq, and, gte, lte, isNull } from "drizzle-orm";
-import DashboardClient from "./components/DashboardClient";
-import { getCurrentUser } from "../lib/auth";
+import { db } from "../../../../../db";
+import { tasks, taskLogs, users } from "../../../../../db/schema";
+import { eq, and, gte, lte } from "drizzle-orm";
+import DashboardClient from "../../../../../app/components/DashboardClient";
+import { getCurrentUser } from "../../../../../lib/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
-export default async function Page() {
+export default async function UserTasksPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
-  if (!user) {
-    redirect("/login");
+  if (!user || !user.admin) {
+    redirect("/");
+  }
+
+  const { id } = await params;
+  const targetUserId = parseInt(id, 10);
+  
+  // Verify user exists and get username
+  const [targetUser] = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+  if (!targetUser) {
+    redirect("/settings");
   }
 
   const todayDate = new Date();
@@ -27,9 +38,7 @@ export default async function Page() {
   const formattedMonthStart = format(monthStart, "yyyy-MM-dd");
   const formattedMonthEnd = format(monthEnd, "yyyy-MM-dd");
 
-  const userCondition = user.admin && user.id === null 
-    ? isNull(tasks.userId) 
-    : eq(tasks.userId, user.id as number);
+  const userCondition = eq(tasks.userId, targetUserId);
 
   const [resY, resT, resTom, resMonth] = await Promise.all([
     db.select({
@@ -78,7 +87,6 @@ export default async function Page() {
     .where(and(gte(taskLogs.scheduleDate, formattedMonthStart), lte(taskLogs.scheduleDate, formattedMonthEnd), userCondition)),
   ]);
 
-  // Process monthly data
   const initialCalendarStatus: Record<string, { completed: number; total: number }> = {};
   resMonth.forEach(log => {
     const date = log.scheduleDate;
@@ -98,10 +106,24 @@ export default async function Page() {
   };
 
   return (
-    <DashboardClient 
-      initialTasks={initialTasks} 
-      initialCalendarStatus={initialCalendarStatus}
-      isAdmin={!!user.admin} 
-    />
+    <>
+      {/* Absolute Header Overlay for Admin return link */}
+      <div className="fixed top-24 inset-x-0 z-40 bg-slate-800 text-white px-8 py-2 md:px-12 flex items-center shadow-md">
+        <Link href="/settings" className="flex items-center gap-2 hover:text-slate-300 transition-colors text-sm font-bold">
+          <ArrowLeft className="w-4 h-4" /> 返回设置
+        </Link>
+        <span className="mx-4 text-slate-500">|</span>
+        <span className="text-sm font-bold">正在管理用户: <span className="text-blue-300">{targetUser.username}</span> 的任务</span>
+      </div>
+      
+      <div className="pt-10">
+        <DashboardClient 
+          initialTasks={initialTasks} 
+          initialCalendarStatus={initialCalendarStatus}
+          isAdmin={true}
+          targetUserId={targetUserId}
+        />
+      </div>
+    </>
   );
 }

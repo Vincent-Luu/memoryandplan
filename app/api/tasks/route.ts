@@ -1,15 +1,28 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../db';
 import { tasks, taskLogs } from '../../../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
+import { getCurrentUser } from '../../../lib/auth';
 
 export async function POST(request: Request) {
   try {
-    const { title, tag, localDate } = await request.json();
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { title, tag, localDate, targetUserId } = await request.json();
     if (!title) return NextResponse.json({ error: 'Title is required' }, { status: 400 });
 
+    let finalUserId: number | null = user.id as number;
+    if (user.admin) {
+      if (targetUserId !== undefined) {
+        finalUserId = targetUserId;
+      } else {
+        finalUserId = null; // admin's own tasks
+      }
+    }
+
     // Insert new task
-    const newTask = await db.insert(tasks).values({ title, tag }).returning({ id: tasks.id });
+    const newTask = await db.insert(tasks).values({ title, tag, userId: finalUserId }).returning({ id: tasks.id });
     const taskId = newTask[0].id;
 
     // Use provided localDate (YYYY-MM-DD) or fallback to server date
@@ -48,9 +61,22 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date'); 
+    const targetUserIdStr = searchParams.get('userId');
     if (!date) return NextResponse.json({ error: 'Date is required (YYYY-MM-DD format)' }, { status: 400 });
+
+    let userCondition;
+    if (user.admin && targetUserIdStr) {
+      userCondition = eq(tasks.userId, parseInt(targetUserIdStr, 10));
+    } else if (user.admin && user.id === null) {
+      userCondition = isNull(tasks.userId);
+    } else {
+      userCondition = eq(tasks.userId, user.id as number);
+    }
 
     // Fetch the task logs for the specified date
     const logs = await db.select({
@@ -63,7 +89,7 @@ export async function GET(request: Request) {
     })
     .from(taskLogs)
     .innerJoin(tasks, eq(taskLogs.taskId, tasks.id))
-    .where(eq(taskLogs.scheduleDate, date));
+    .where(and(eq(taskLogs.scheduleDate, date), userCondition));
 
     return NextResponse.json(logs);
   } catch (error) {

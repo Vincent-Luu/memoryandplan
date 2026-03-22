@@ -1,12 +1,27 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../../../db';
 import { tasks, taskLogs } from '../../../../../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import { getCurrentUser } from '../../../../../lib/auth';
+
+async function checkTaskOwnership(taskId: number) {
+  const user = await getCurrentUser();
+  if (!user) return false;
+
+  const [task] = await db.select({ userId: tasks.userId }).from(tasks).where(eq(tasks.id, taskId)).limit(1);
+  if (!task) return false;
+
+  if (user.admin) return true; // Admin can edit/delete anything
+  return task.userId === user.id;
+}
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const taskId = parseInt(id, 10);
+
+    const isOwner = await checkTaskOwnership(taskId);
+    if (!isOwner) return NextResponse.json({ error: 'Unauthorized or not found' }, { status: 403 });
 
     // Drizzle with simple pgTable: Delete logs first due to FK constraint
     await db.delete(taskLogs).where(eq(taskLogs.taskId, taskId));
@@ -34,6 +49,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!title) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
+
+    const isOwner = await checkTaskOwnership(taskId);
+    if (!isOwner) return NextResponse.json({ error: 'Unauthorized or not found' }, { status: 403 });
     
     // Update the task title and tag
     const updatedTask = await db.update(tasks).set({ title, tag }).where(eq(tasks.id, taskId)).returning();
@@ -48,3 +66,4 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
+

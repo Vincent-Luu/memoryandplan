@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { format, addDays, subDays, startOfMonth, endOfMonth, eachDayOfInterval, isToday, addMonths, subMonths } from "date-fns";
-import { PlusCircle, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, List, ChevronLeft, ChevronRight, X as CloseIcon } from "lucide-react";
+import { PlusCircle, CheckCircle2, Circle, Clock, Calendar as CalendarIcon, List, ChevronLeft, ChevronRight, X as CloseIcon, Sun, Moon } from "lucide-react";
 import Link from "next/link";
+import { useTheme } from "./ThemeProvider";
 
 type TaskLog = {
   id: number;
@@ -25,9 +26,12 @@ interface DashboardClientProps {
     tomorrow: TaskLog[];
   };
   initialCalendarStatus: DailyStatus;
+  isAdmin?: boolean;
+  targetUserId?: number;
 }
 
-export default function DashboardClient({ initialTasks, initialCalendarStatus }: DashboardClientProps) {
+export default function DashboardClient({ initialTasks, initialCalendarStatus, isAdmin, targetUserId }: DashboardClientProps) {
+  const { theme, toggleTheme } = useTheme();
   const [tasks, setTasks] = useState(initialTasks);
   const [calendarStatus, setCalendarStatus] = useState(initialCalendarStatus);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,6 +66,8 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
   const monthEnd = endOfMonth(viewDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
+  const getQueryAppend = () => targetUserId ? `&userId=${targetUserId}` : "";
+
   const fetchTasks = async () => {
     try {
       const formattedToday = format(todayDate, "yyyy-MM-dd");
@@ -69,9 +75,9 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
       const formattedTomorrow = format(tomorrowDate, "yyyy-MM-dd");
 
       const [resY, resT, resTom] = await Promise.all([
-        fetch(`/api/tasks?date=${formattedYesterday}`).then(res => res.json()),
-        fetch(`/api/tasks?date=${formattedToday}`).then(res => res.json()),
-        fetch(`/api/tasks?date=${formattedTomorrow}`).then(res => res.json()),
+        fetch(`/api/tasks?date=${formattedYesterday}${getQueryAppend()}`).then(res => res.json()),
+        fetch(`/api/tasks?date=${formattedToday}${getQueryAppend()}`).then(res => res.json()),
+        fetch(`/api/tasks?date=${formattedTomorrow}${getQueryAppend()}`).then(res => res.json()),
       ]);
 
       setTasks({
@@ -88,16 +94,13 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
     try {
       const formattedStart = format(startOfMonth(viewDate), "yyyy-MM-dd");
       const formattedEnd = format(endOfMonth(viewDate), "yyyy-MM-dd");
-      const resCal = await fetch(`/api/tasks/month?start=${formattedStart}&end=${formattedEnd}`).then(res => res.json());
+      const resCal = await fetch(`/api/tasks/month?start=${formattedStart}&end=${formattedEnd}${getQueryAppend()}`).then(res => res.json());
       setCalendarStatus(resCal || {});
     } catch (error) {
       console.error("加载月度状态失败", error);
     }
   };
 
-  // Skip initial fetch since we have props, but we still want to refresh on mount to ensure latest?
-  // Actually, Server Component handles initial. Client refresh is only for user actions.
-  // But we still need fetchMonthStatus when viewDate changes.
   useEffect(() => {
     fetchMonthStatus();
   }, [viewDate]);
@@ -110,7 +113,7 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
     setSelectedDayDate(format(day, "yyyy年MM月dd日"));
     
     try {
-      const res = await fetch(`/api/tasks?date=${dayStr}`).then(r => r.json());
+      const res = await fetch(`/api/tasks?date=${dayStr}${getQueryAppend()}`).then(r => r.json());
       setSelectedDayTasks(Array.isArray(res) ? res : []);
       setIsPreviewModalOpen(true);
     } catch (error) {
@@ -129,7 +132,8 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
         body: JSON.stringify({ 
           title: newTaskTitle,
           tag: selectedTag,
-          localDate: format(todayDate, "yyyy-MM-dd") 
+          localDate: format(todayDate, "yyyy-MM-dd"),
+          targetUserId: targetUserId
         }),
       });
       if (res.ok) {
@@ -194,9 +198,9 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
       
       <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2 pb-4 mt-4">
         {tasksList.length === 0 ? (
-          <div className={`h-40 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl ${daySection === 'preview' ? 'border-slate-300 bg-slate-50' : 'border-slate-200 bg-white/50'}`}>
-            <Clock className="w-8 h-8 text-slate-300 mb-2" />
-            <p className="text-sm text-slate-400">没有安排任务</p>
+          <div className={`h-40 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl transition-colors ${daySection === 'preview' ? 'border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50' : 'border-slate-200 bg-white/50 dark:border-slate-700 dark:bg-slate-900/30'}`}>
+            <Clock className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+            <p className="text-sm text-slate-400 dark:text-slate-500">没有安排任务</p>
           </div>
         ) : (
           tasksList.map(task => (
@@ -204,27 +208,27 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
               key={task.id} 
               className={`group flex items-center p-4 rounded-2xl transition-all duration-300 backdrop-blur-md border ${
                 task.status 
-                  ? 'bg-slate-100/80 border-slate-200/60' 
-                  : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-300 cursor-pointer shadow-sm hover:shadow-md'
+                  ? 'bg-slate-100/80 border-slate-200/60 dark:bg-slate-800/40 dark:border-slate-700' 
+                  : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 cursor-pointer shadow-sm hover:shadow-md'
               }`}
               onClick={() => toggleTaskStatus(task.id, task.status, daySection)}
             >
               <button className="mr-4 focus:outline-none flex-shrink-0 transition-transform group-hover:scale-110 group-active:scale-95">
                 {task.status ? (
-                  <CheckCircle2 className="w-6 h-6 text-slate-400" />
+                  <CheckCircle2 className="w-6 h-6 text-slate-400 dark:text-slate-500" />
                 ) : (
-                  <Circle className="w-6 h-6 text-slate-300 group-hover:text-slate-500" />
+                  <Circle className="w-6 h-6 text-slate-300 group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300" />
                 )}
               </button>
               
               {task.tag && (
-                <div className={`px-2.5 py-1 rounded-lg text-xs font-bold mr-3 border ${getTagStyle(task.tag).bg} ${getTagStyle(task.tag).text} ${getTagStyle(task.tag).border} shadow-sm flex-shrink-0`}>
+                <div className={`px-2.5 py-1 rounded-lg text-xs font-bold mr-3 border ${getTagStyle(task.tag).bg} ${getTagStyle(task.tag).text} ${getTagStyle(task.tag).border} dark:opacity-90 shadow-sm flex-shrink-0`}>
                   {task.tag}
                 </div>
               )}
 
               <span className={`text-lg font-medium transition-all ${
-                task.status ? 'text-slate-400 line-through' : 'text-slate-700'
+                task.status ? 'text-slate-400 dark:text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200'
               }`}>
                 {task.title}
               </span>
@@ -236,35 +240,50 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-slate-200 text-slate-800 font-sans selection:bg-slate-300/50 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-800 dark:text-slate-200 font-sans selection:bg-slate-300/50 dark:selection:bg-slate-700/50 relative overflow-hidden transition-colors duration-500">
       
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-slate-200/60 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100/40 dark:bg-blue-900/20 rounded-full blur-3xl pointer-events-none transition-colors duration-700" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-slate-200/60 dark:bg-slate-800/40 rounded-full blur-3xl pointer-events-none transition-colors duration-700" />
 
-      <header className="fixed top-0 inset-x-0 h-24 flex items-center justify-between px-8 md:px-12 z-40 bg-white/40 backdrop-blur-xl border-b border-white/50 shadow-sm">
+      <header className="fixed top-0 inset-x-0 h-24 flex items-center justify-between px-8 md:px-12 z-40 bg-white/40 dark:bg-slate-900/60 backdrop-blur-xl border-b border-white/50 dark:border-slate-800 shadow-sm transition-colors duration-500">
         <div className="flex items-center gap-6">
-          <h1 className="text-xl md:text-3xl font-extrabold text-slate-700 tracking-tight">
+          <h1 className="text-xl md:text-3xl font-extrabold text-slate-700 dark:text-slate-100 tracking-tight transition-colors">
             艾宾浩斯日程计划
           </h1>
           <button 
             onClick={() => setIsCalendarOpen(true)}
-            className="flex items-center gap-2 bg-white/60 hover:bg-white text-slate-600 px-4 py-2 rounded-xl font-semibold shadow-sm border border-slate-200 transition-all hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 bg-white/60 dark:bg-slate-800/60 hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl font-semibold shadow-sm border border-slate-200 dark:border-slate-700 transition-all hover:scale-105 active:scale-95"
           >
             <CalendarIcon className="w-5 h-5" />
             <span className="hidden sm:inline">月度视图</span>
           </button>
         </div>
         <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Link 
+              href="/settings"
+              className="flex items-center gap-2 bg-white/50 dark:bg-slate-800/50 hover:bg-white/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-5 py-2.5 rounded-full font-semibold shadow-sm border border-slate-200 dark:border-slate-700 transition-all hover:scale-105 active:scale-95"
+            >
+              <span className="hidden sm:inline">设置 (Admin)</span>
+            </Link>
+          )}
           <Link 
-            href="/tasks"
-            className="flex items-center gap-2 bg-white/50 hover:bg-white/80 text-slate-600 px-5 py-2.5 rounded-full font-semibold shadow-sm border border-slate-200 transition-all hover:scale-105 active:scale-95"
+            href={targetUserId ? `/tasks?userId=${targetUserId}` : "/tasks"}
+            className="flex items-center gap-2 bg-white/50 dark:bg-slate-800/50 hover:bg-white/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-5 py-2.5 rounded-full font-semibold shadow-sm border border-slate-200 dark:border-slate-700 transition-all hover:scale-105 active:scale-95"
           >
             <List className="w-5 h-5" />
             <span className="hidden sm:inline">任务列表</span>
           </Link>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center p-2.5 bg-white/50 dark:bg-slate-800/50 hover:bg-white/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full font-semibold shadow-sm border border-slate-200 dark:border-slate-700 transition-all hover:scale-105 active:scale-95"
+            title="切换深色/浅色模式"
+          >
+            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-full font-semibold shadow-md transition-all hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 bg-slate-600 dark:bg-slate-200 hover:bg-slate-700 dark:hover:bg-white text-white dark:text-slate-800 px-5 py-2.5 rounded-full font-semibold shadow-md transition-all hover:scale-105 active:scale-95 ml-2"
           >
             <PlusCircle className="w-5 h-5" />
             <span className="hidden sm:inline">新任务</span>
@@ -276,7 +295,7 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
         
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch h-[calc(100vh-14rem)]">
           
-          <div className="hidden lg:flex relative transform lg:scale-95 opacity-80 blur-[0.5px] hover:blur-none hover:opacity-100 transition-all duration-500 ease-out flex-col bg-white/50 backdrop-blur-md rounded-[2rem] p-6 shadow-md border border-white/60">
+          <div className="hidden lg:flex relative transform lg:scale-95 opacity-80 blur-[0.5px] hover:blur-none hover:opacity-100 transition-all duration-500 ease-out flex-col bg-white/50 dark:bg-slate-900/50 backdrop-blur-md rounded-[2rem] p-6 shadow-md border border-white/60 dark:border-slate-700/60">
             <TaskCardList 
               title="昨天" 
               dateString={format(yesterdayDate, "MM月dd日")} 
@@ -285,7 +304,7 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
             />
           </div>
 
-          <div className="relative transform z-20 flex flex-col bg-white rounded-[2rem] p-8 shadow-xl border border-slate-200 ring-1 ring-slate-100/50 h-full">
+          <div className="relative transform z-20 flex flex-col bg-white dark:bg-slate-800 rounded-[2rem] p-8 shadow-xl border border-slate-200 dark:border-slate-700 ring-1 ring-slate-100/50 dark:ring-slate-700/50 h-full transition-colors duration-500">
             <TaskCardList 
               title="今天" 
               dateString={format(todayDate, "yyyy年 MM月dd日")} 
@@ -294,7 +313,7 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
             />
           </div>
 
-          <div className="hidden lg:flex relative transform lg:scale-95 opacity-80 blur-[0.5px] hover:blur-none hover:opacity-100 transition-all duration-500 ease-out flex-col bg-white/50 backdrop-blur-md rounded-[2rem] p-6 shadow-md border border-white/60">
+          <div className="hidden lg:flex relative transform lg:scale-95 opacity-80 blur-[0.5px] hover:blur-none hover:opacity-100 transition-all duration-500 ease-out flex-col bg-white/50 dark:bg-slate-900/50 backdrop-blur-md rounded-[2rem] p-6 shadow-md border border-white/60 dark:border-slate-700/60">
             <TaskCardList 
               title="明天" 
               dateString={format(tomorrowDate, "MM月dd日")} 
@@ -307,38 +326,38 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
       </main>
 
       {isCalendarOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white/90 backdrop-blur-xl border border-white w-full max-w-2xl rounded-[2.5rem] p-8 md:p-10 shadow-huge relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-slate-100 via-slate-400 to-slate-100 opacity-20" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-white dark:border-slate-800 w-full max-w-2xl rounded-[2.5rem] p-8 md:p-10 shadow-huge relative overflow-hidden transition-colors duration-500">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-slate-100 via-slate-400 to-slate-100 dark:from-slate-800 dark:via-slate-500 dark:to-slate-800 opacity-20" />
             
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-slate-100 rounded-2xl text-slate-600">
+                <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-600 dark:text-slate-300">
                   <CalendarIcon className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-800 tracking-tight">{format(viewDate, "yyyy年 MM月")}</h3>
-                  <p className="text-slate-400 text-sm font-medium">查看并点击日期以预览打卡</p>
+                  <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">{format(viewDate, "yyyy年 MM月")}</h3>
+                  <p className="text-slate-400 dark:text-slate-500 text-sm font-medium">查看并点击日期以预览打卡</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-2xl">
+                <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-1.5 rounded-2xl">
                   <button 
                     onClick={handlePrevMonth}
-                    className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-600 active:scale-90"
+                    className="p-2.5 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm rounded-xl transition-all text-slate-600 dark:text-slate-300 active:scale-90"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
                   <button 
                     onClick={handleNextMonth}
-                    className="p-2.5 hover:bg-white hover:shadow-sm rounded-xl transition-all text-slate-600 active:scale-90"
+                    className="p-2.5 hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm rounded-xl transition-all text-slate-600 dark:text-slate-300 active:scale-90"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
                 </div>
                 <button 
                   onClick={() => setIsCalendarOpen(false)}
-                  className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+                  className="p-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all"
                 >
                   <CloseIcon className="w-6 h-6" />
                 </button>
@@ -350,21 +369,21 @@ export default function DashboardClient({ initialTasks, initialCalendarStatus }:
                 const dayStr = format(day, "yyyy-MM-dd");
                 const status = calendarStatus[dayStr];
                 
-                let bgColorClass = "bg-white border-slate-100 hover:border-slate-300"; 
-                let textClass = "text-slate-400";
+                let bgColorClass = "bg-white dark:bg-slate-800/80 border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500"; 
+                let textClass = "text-slate-400 dark:text-slate-500";
 
                 if (status?.total > 0) {
                   if (status.completed === status.total) {
-                    bgColorClass = "bg-green-500/10 border-green-200 hover:bg-green-500/20"; 
-                    textClass = "text-green-700 font-bold";
+                    bgColorClass = "bg-green-500/10 dark:bg-green-500/20 border-green-200 dark:border-green-800 hover:bg-green-500/20"; 
+                    textClass = "text-green-700 dark:text-green-400 font-bold";
                   } else {
-                    bgColorClass = "bg-yellow-500/10 border-yellow-200 hover:bg-yellow-500/20"; 
-                    textClass = "text-yellow-700 font-bold";
+                    bgColorClass = "bg-yellow-500/10 dark:bg-yellow-500/20 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-500/20"; 
+                    textClass = "text-yellow-700 dark:text-yellow-400 font-bold";
                   }
                 }
 
                 if (isToday(day)) {
-                  bgColorClass += " ring-2 ring-slate-400 ring-offset-2";
+                  bgColorClass += " ring-2 ring-slate-400 dark:ring-slate-500 ring-offset-2 dark:ring-offset-slate-900";
                 }
 
                 return (

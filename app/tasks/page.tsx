@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { format } from "date-fns";
 import { ArrowLeft, Trash2, Edit2, Check, X } from "lucide-react";
 import Link from "next/link";
@@ -24,12 +24,15 @@ const SUBJECT_TAGS = [
   { name: "其他", color: "from-slate-400 to-slate-500", bg: "bg-slate-50", text: "text-slate-600", border: "border-slate-100" },
 ];
 
-export default function TaskListPage() {
+export default function TaskListPage({ searchParams }: { searchParams: Promise<{ userId?: string }> }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editTag, setEditTag] = useState<string>("其他");
+  // Unwrap promise safely
+  const resolvedParams = use(searchParams);
+  const targetUserId = resolvedParams.userId;
 
   const getTagStyle = (tagName: string | null) => {
     return SUBJECT_TAGS.find(t => t.name === tagName) || SUBJECT_TAGS[6];
@@ -38,7 +41,8 @@ export default function TaskListPage() {
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/tasks/all");
+      const url = targetUserId ? `/api/tasks/all?userId=${targetUserId}` : "/api/tasks/all";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setTasks(data);
@@ -52,7 +56,7 @@ export default function TaskListPage() {
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [targetUserId]);
 
   const handleEditClick = (task: Task) => {
     setEditingId(task.id);
@@ -98,33 +102,36 @@ export default function TaskListPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-slate-200 text-slate-800 font-sans selection:bg-slate-300/50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-slate-200 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-800 dark:text-slate-200 font-sans selection:bg-slate-300/50 dark:selection:bg-slate-700/50 transition-colors duration-500">
       
       {/* Header */}
-      <header className="fixed top-0 inset-x-0 h-24 flex items-center px-8 md:px-12 z-40 bg-white/40 backdrop-blur-xl border-b border-white/50 shadow-sm">
-        <Link 
-          href="/" 
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors mr-6"
-        >
-          <ArrowLeft className="w-6 h-6" />
-          <span className="font-medium hidden sm:inline">返回看板</span>
-        </Link>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-slate-700 tracking-tight border-l-2 border-slate-300 pl-6">
-          所有任务列表
-        </h1>
+      <header className="fixed top-0 inset-x-0 h-24 flex items-center px-8 md:px-12 z-40 bg-white/40 dark:bg-slate-900/60 backdrop-blur-xl border-b border-white/50 dark:border-slate-800 shadow-sm justify-between transition-colors duration-500">
+        <div className="flex items-center">
+          <Link 
+            href={targetUserId ? `/settings/user/${targetUserId}/tasks` : "/"}
+            className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors mr-6"
+          >
+            <ArrowLeft className="w-6 h-6" />
+            <span className="font-medium hidden sm:inline">返回看板</span>
+          </Link>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-slate-700 dark:text-slate-100 tracking-tight border-l-2 border-slate-300 dark:border-slate-700 pl-6 transition-colors">
+            所有任务列表
+            {targetUserId && <span className="ml-4 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-3 py-1 rounded-full align-middle font-semibold border border-blue-200/50 dark:border-blue-800/50">正在管理用户任务</span>}
+          </h1>
+        </div>
       </header>
 
       {/* Main Layout */}
       <main className="pt-32 pb-12 px-6 md:px-12 max-w-4xl mx-auto">
         
-        <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] p-8 shadow-sm border border-white/80 min-h-[500px]">
+        <div className="bg-white/60 dark:bg-slate-800/80 backdrop-blur-xl rounded-[2rem] p-8 shadow-sm border border-white/80 dark:border-slate-700 min-h-[500px] transition-colors duration-500">
           {loading ? (
             <div className="flex justify-center items-center h-40">
-              <span className="text-slate-500 font-medium">加载中...</span>
+              <span className="text-slate-500 dark:text-slate-400 font-medium">加载中...</span>
             </div>
           ) : tasks.length === 0 ? (
             <div className="flex justify-center items-center h-40">
-              <span className="text-slate-400">目前没有任何任务</span>
+              <span className="text-slate-400 dark:text-slate-500">目前没有任何任务</span>
             </div>
           ) : (
             <ul className="space-y-4">
@@ -134,7 +141,7 @@ export default function TaskListPage() {
                 return (
                   <li 
                     key={task.id} 
-                    className="group flex flex-col p-5 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all gap-4"
+                    className="group flex flex-col p-5 rounded-2xl bg-white dark:bg-slate-900/50 border border-slate-100 dark:border-slate-700/80 shadow-sm hover:shadow-md transition-all gap-4"
                   >
                     
                     {editingId === task.id ? (
@@ -144,25 +151,25 @@ export default function TaskListPage() {
                             type="text" 
                             value={editTitle}
                             onChange={(e) => setEditTitle(e.target.value)}
-                            className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 font-bold text-lg"
+                            className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-600 transition-colors font-bold text-lg"
                             autoFocus
                           />
                           <button 
                             onClick={() => handleSaveEdit(task.id)}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            className="p-2 text-green-600 dark:text-green-500 hover:bg-green-50 dark:hover:bg-green-500/10 rounded-lg transition-colors"
                           >
                             <Check className="w-6 h-6" />
                           </button>
                           <button 
                             onClick={handleCancelEdit}
-                            className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors"
+                            className="p-2 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                           >
                             <X className="w-6 h-6" />
                           </button>
                         </div>
 
                         <div>
-                          <p className="text-xs font-bold text-slate-500 mb-2">更改标签</p>
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">更改标签</p>
                           <div className="flex flex-wrap gap-2">
                             {SUBJECT_TAGS.map((tag) => (
                               <button
@@ -171,8 +178,8 @@ export default function TaskListPage() {
                                 onClick={() => setEditTag(tag.name)}
                                 className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border ${
                                   editTag === tag.name
-                                    ? `${tag.bg} ${tag.text} ${tag.border} ring-2 ring-slate-200`
-                                    : "bg-white text-slate-400 border-slate-100 hover:border-slate-200"
+                                    ? `${tag.bg} ${tag.text} ${tag.border} dark:opacity-90 ring-2 ring-slate-200 dark:ring-slate-700`
+                                    : "bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700 hover:border-slate-200 dark:hover:border-slate-600"
                                 }`}
                               >
                                 {tag.name}
@@ -187,25 +194,25 @@ export default function TaskListPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-1">
                               {task.tag && (
-                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border uppercase tracking-wider ${getTagStyle(task.tag).bg} ${getTagStyle(task.tag).text} ${getTagStyle(task.tag).border} shadow-sm`}>
+                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border uppercase tracking-wider ${getTagStyle(task.tag).bg} ${getTagStyle(task.tag).text} ${getTagStyle(task.tag).border} dark:opacity-90 shadow-sm`}>
                                   {task.tag}
                                 </span>
                               )}
-                              <h3 className="text-lg font-bold text-slate-700">{task.title}</h3>
+                              <h3 className="text-lg font-bold text-slate-700 dark:text-slate-200">{task.title}</h3>
                             </div>
-                            <p className="text-xs text-slate-400 mb-3">
+                            <p className="text-xs text-slate-400 dark:text-slate-500 mb-3">
                               创建于: {format(new Date(task.createdAt), "yyyy/MM/dd HH:mm")}
                             </p>
                             
                             {/* Progress Info */}
                             <div className="flex items-center gap-4 max-w-xs">
-                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                              <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                 <div 
-                                  className={`h-full rounded-full transition-all duration-700 ease-out ${percentage === 100 ? 'bg-green-400' : 'bg-slate-400'}`}
+                                  className={`h-full rounded-full transition-all duration-700 ease-out ${percentage === 100 ? 'bg-green-400 dark:bg-green-500' : 'bg-slate-400 dark:bg-slate-500'}`}
                                   style={{ width: `${percentage}%` }}
                                 />
                               </div>
-                              <span className="text-[10px] font-bold text-slate-500 whitespace-nowrap">
+                              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">
                                 {task.completedLogs}/{task.totalLogs} ({percentage}%)
                               </span>
                             </div>
@@ -215,14 +222,14 @@ export default function TaskListPage() {
                         <div className="flex items-center gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                           <button 
                             onClick={() => handleEditClick(task)}
-                            className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+                            className="p-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"
                             title="编辑任务"
                           >
                             <Edit2 className="w-5 h-5" />
                           </button>
                           <button 
                             onClick={() => handleDelete(task.id)}
-                            className="p-2.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            className="p-2.5 text-red-300 dark:text-red-900/50 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all"
                             title="删除任务"
                           >
                             <Trash2 className="w-5 h-5" />
@@ -242,3 +249,4 @@ export default function TaskListPage() {
     </div>
   );
 }
+
